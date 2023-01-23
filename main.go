@@ -1,104 +1,44 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
+	"tw-econ-telegram-bridge/econ"
 
 	"gopkg.in/telebot.v3"
 )
 
 var (
-	chatRegex = regexp.MustCompile(`\[chat\]: \d+:-?\d+:(.*)`)
+	chatRegex  = regexp.MustCompile(`\[chat\]: \d+:-?\d+:(.*)`)
+	host       = getEnvDefault("TW_HOST", "localhost")
+	serverName = getEnv("SERVER_NAME")
+	port       = intMustParse(getEnvDefault("TW_PORT", "8303"))
+	password   = getEnv("TW_PASSWORD")
+	token      = getEnv("API_TOKEN")
+	chatId     = getEnv("CHAT_ID")
+	console    = econ.NewECON(host, password, port)
 )
 
-type FakeRecipient struct {
-	ID string
-}
-
-func (f FakeRecipient) Recipient() string {
-	return f.ID
+func init() {
+	log.SetFlags(0)
+	log.SetOutput(new(logWriter))
 }
 
 func main() {
-	host, exists := os.LookupEnv("TW_HOST")
-	if !exists {
-		log.Fatalln("TW_HOST not set")
-	}
-
-	hostName, exists := os.LookupEnv("SERVER_NAME")
-	if !exists {
-		log.Fatalln("SERVER_NAME not set")
-	}
-
-	port, exists := os.LookupEnv("TW_PORT")
-	if !exists {
-		log.Fatalln("TW_PORT not set")
-	}
-
-	password, exists := os.LookupEnv("TW_PASSWORD")
-	if !exists {
-		log.Fatalln("TW_PASSWORD not set")
-	}
-
-	token, exists := os.LookupEnv("API_TOKEN")
-	if !exists {
-		log.Fatalln("API_TOKEN not set")
-	}
-
-	chatID, exists := os.LookupEnv("CHAT_ID")
-	if !exists {
-		log.Fatalln("CHAT_ID not set")
-	}
-
-	conn, err := net.Dial("tcp", host+":"+port)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	message := string(buffer[:n])
-	if strings.Contains(message, "Enter password") {
-		_, err = conn.Write([]byte(password + "\n"))
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		buffer := make([]byte, 1024)
-		n, err := conn.Read(buffer)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		message := string(buffer[:n])
-		if !strings.Contains(message, "Authentication successful") {
-			log.Fatalln("Wrong password or timeout")
-		}
-	}
+	log.Println("Starting tw-econ-telegram-bridge...")
 
 	bot, err := telebot.NewBot(telebot.Settings{
 		Token:  token,
 		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
 	})
 	if err != nil {
-		log.Fatal(err)
-		return
+		log.Fatalln(err)
 	}
-
-	mutex := sync.Mutex{}
 
 	bot.Handle(telebot.OnText, func(ctx telebot.Context) error {
 		username := strings.Join(
@@ -110,11 +50,7 @@ func main() {
 		)
 
 		message := fmt.Sprintf("%v: %v", username, ctx.Message().Text)
-
-		mutex.Lock()
-		defer mutex.Unlock()
-		// _, err := conn.Write([]byte(`say "` + message + `"\n`))
-		_, err := conn.Write([]byte(`say "` + message + `"` + "\n"))
+		err := console.Send(message)
 		if err != nil {
 			return err
 		}
@@ -122,27 +58,25 @@ func main() {
 		return nil
 	})
 
-	go func() {
-		for conn != nil {
-			buffer := make([]byte, 1024)
-			n, err := conn.Read(buffer)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
+	err = console.Connect()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
+	go func() {
+		for console.Connected {
+			message, err := console.Read()
+			if err != nil {
 				log.Fatalln(err)
 			}
-
-			message = string(buffer[:n])
 			if strings.Contains(message, "chat") {
 				match := chatRegex.FindStringSubmatch(message)
 				if len(match) == 0 {
 					continue
 				}
 
-				message := fmt.Sprintf("[%v] %v", hostName, match[1])
-				_, err := bot.Send(FakeRecipient{ID: chatID}, message)
+				message := fmt.Sprintf("[%v] %v", serverName, match[1])
+				_, err := bot.Send(FakeRecipient{ID: chatId}, message)
 				if err != nil {
 					log.Fatalln(err)
 				}
@@ -154,12 +88,14 @@ func main() {
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-	for range c {
-		conn.Close()
-		conn = nil
 
-		bot.Stop()
+	select {
+	case <-console.Completed:
+		break
+
+	case <-c:
 		break
 	}
+
 	log.Println("Shutting down...")
 }
