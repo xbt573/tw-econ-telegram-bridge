@@ -76,7 +76,9 @@ func main() {
 				}
 
 				message := fmt.Sprintf("[%v] %v", serverName, match[1])
-				_, err := bot.Send(FakeRecipient{ID: chatId}, message)
+				_, err := bot.Send(FakeRecipient{ID: chatId}, message, &telebot.SendOptions{
+					ParseMode: telebot.ModeMarkdownV2,
+				})
 				if err != nil {
 					log.Fatalln(err)
 				}
