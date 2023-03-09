@@ -6,7 +6,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"regexp"
 	"strings"
+	"time"
 )
 
 var (
@@ -14,15 +16,17 @@ var (
 	ErrAlreadyDisconnected = errors.New("econ: already disconnected")
 	ErrDisconnected        = errors.New("econ: disconnected")
 	ErrWrongPassword       = errors.New("econ: wrong password")
+	serverNameRegex        = regexp.MustCompile(`(?U)Value: ([\s\S]+)\n`)
 )
 
 type ECON struct {
-	Connected bool
-	Completed chan bool
-	ip        string
-	password  string
-	port      int
-	conn      net.Conn
+	Connected  bool
+	Completed  chan bool
+	ServerName string
+	ip         string
+	password   string
+	port       int
+	conn       net.Conn
 }
 
 func (e *ECON) Connect() error {
@@ -53,6 +57,38 @@ func (e *ECON) Connect() error {
 
 	if !strings.Contains(string(buffer[:n]), "Authentication successful") {
 		return ErrWrongPassword
+	}
+
+	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+
+	for {
+		_, err = conn.Read(make([]byte, 1024))
+		if err != nil {
+			break
+		}
+	}
+
+	conn.SetReadDeadline(time.Time{})
+
+	_, err = conn.Write([]byte("sv_name\n"))
+	if err != nil {
+		return err
+	}
+
+	for {
+		n, err := conn.Read(buffer)
+		if err != nil {
+			return err
+		}
+
+		if strings.Contains(string(buffer[:n]), "Value") {
+			break
+		}
+	}
+
+	match := serverNameRegex.FindStringSubmatch(string(buffer[:n]))
+	if len(match) > 0 {
+		e.ServerName = match[1]
 	}
 
 	e.conn = conn

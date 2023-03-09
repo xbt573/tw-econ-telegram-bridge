@@ -1,23 +1,17 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
-	"strconv"
+
+	"golang.org/x/exp/slog"
 )
-
-type FakeRecipient struct {
-	ID string
-}
-
-func (f FakeRecipient) Recipient() string {
-	return f.ID
-}
 
 func getEnv(name string) string {
 	env, exists := os.LookupEnv(name)
 	if !exists {
-		log.Fatalf("%v not set\n", name)
+		slog.Error(fmt.Sprintf("%v not set", name), nil)
+
 	}
 
 	return env
@@ -30,13 +24,4 @@ func getEnvDefault(name string, defaultValue string) string {
 	}
 
 	return env
-}
-
-func intMustParse(str string) int {
-	result, err := strconv.Atoi(str)
-	if err != nil {
-		log.Fatalf("\"%v\" is invalid integer\n", str)
-	}
-
-	return result
 }

@@ -1,103 +1,127 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+	"tw-econ-telegram-bridge/bot"
 	"tw-econ-telegram-bridge/econ"
+	"tw-econ-telegram-bridge/telegram"
 
+	"golang.org/x/exp/slog"
 	"gopkg.in/telebot.v3"
 )
 
 var (
-	chatRegex  = regexp.MustCompile(`\[chat\]: \d+:-?\d+:(.*)`)
+	portsRegex = regexp.MustCompile(`(\d+:\d+|\d+),?`)
+	rangeRegex = regexp.MustCompile(`(\d+):(\d+)`)
 	host       = getEnvDefault("TW_HOST", "localhost")
-	serverName = getEnv("SERVER_NAME")
-	port       = intMustParse(getEnvDefault("TW_PORT", "8303"))
-	password   = getEnv("TW_PASSWORD")
-	token      = getEnv("API_TOKEN")
-	chatId     = getEnv("CHAT_ID")
-	console    = econ.NewECON(host, password, port)
+	// serverName = getEnv("SERVER_NAME")
+	ports    = getEnvDefault("TW_PORT", "8303")
+	password = getEnv("TW_PASSWORD")
+	token    = getEnv("API_TOKEN")
+	chatId   = getEnv("CHAT_ID")
 )
 
-func init() {
-	log.SetFlags(0)
-	log.SetOutput(new(logWriter))
-}
-
 func main() {
-	log.Println("Starting tw-econ-telegram-bridge...")
+	slog.Info("Starting service...")
 
-	bot, err := telebot.NewBot(telebot.Settings{
+	tg, err := telegram.NewTelegram(telebot.Settings{
 		Token:  token,
-		Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
-	})
+		Poller: &telebot.LongPoller{Timeout: time.Second * 5},
+	}, chatId)
 	if err != nil {
-		log.Fatalln(err)
+		slog.Error("Failed creating bot", err)
+		os.Exit(1)
 	}
 
-	bot.Handle(telebot.OnText, func(ctx telebot.Context) error {
-		username := strings.Join(
-			[]string{
-				ctx.Message().Sender.FirstName,
-				ctx.Message().Sender.LastName,
-			},
-			" ",
-		)
+	slog.Info("Initialized bot...")
 
-		message := fmt.Sprintf("%v: %v", username, ctx.Message().Text)
-		err := console.Send(message)
-		if err != nil {
-			return err
+	match := portsRegex.FindAllStringSubmatch(ports, -1)
+	if len(match) == 0 {
+		slog.Error("Incorrect ports definition, check documentation", nil)
+		os.Exit(1)
+	}
+
+	intPorts := []int{}
+
+	for _, portMatch := range match {
+		if strings.Contains(portMatch[1], ":") {
+			rangeMatch := rangeRegex.FindAllStringSubmatch(portMatch[1], -1)
+			if len(rangeMatch) == 0 {
+				continue
+			}
+
+			first, err := strconv.Atoi(rangeMatch[0][1])
+			if err != nil {
+				continue
+			}
+
+			second, err := strconv.Atoi(rangeMatch[0][2])
+			if err != nil {
+				continue
+			}
+
+			for i := first; i <= second; i++ {
+				intPorts = append(intPorts, i)
+			}
+
+			continue
 		}
 
-		return nil
-	})
+		port, err := strconv.Atoi(portMatch[1])
+		if err != nil {
+			continue
+		}
 
-	err = console.Connect()
-	if err != nil {
-		log.Fatalln(err)
+		intPorts = append(intPorts, port)
 	}
 
-	go func() {
-		for console.Connected {
-			message, err := console.Read()
-			if err != nil {
-				log.Fatalln(err)
-			}
-			if strings.Contains(message, "chat") {
-				match := chatRegex.FindStringSubmatch(message)
-				if len(match) == 0 {
-					continue
-				}
+	if len(intPorts) == 0 {
+		slog.Error("No ports parsed. Check documentation for format", nil)
+		os.Exit(1)
+	}
 
-				message := fmt.Sprintf("[%v] %v", serverName, match[1])
-				_, err := bot.Send(FakeRecipient{ID: chatId}, message, &telebot.SendOptions{
-					ParseMode: telebot.ModeMarkdownV2,
-				})
-				if err != nil {
-					log.Fatalln(err)
-				}
-			}
+	errch := make(chan error)
+	workers := []*bot.Bot{}
+
+	for _, port := range intPorts {
+		econ := econ.NewECON(host, password, port)
+		err := econ.Connect()
+		if err != nil {
+			slog.Error("Failed connecting to ECON", err)
+			os.Exit(1)
+		}
+
+		worker := bot.NewBot(econ, tg)
+
+		go worker.Start(errch)
+		workers = append(workers, worker)
+	}
+
+	go tg.Listen()
+
+	go func() {
+		for {
+			err := <-errch
+
+			slog.Error("error occured", err)
 		}
 	}()
 
-	go bot.Start()
+	slog.Info("Started!")
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
-	select {
-	case <-console.Completed:
-		break
+	<-c
 
-	case <-c:
-		break
+	slog.Info("Shutting down...")
+
+	for _, worker := range workers {
+		worker.Close()
 	}
-
-	log.Println("Shutting down...")
 }

@@ -10,4 +10,4 @@ RUN go build
 FROM alpine:latest
 
 COPY --from=build /app/tw-econ-telegram-bridge /
-ENTRYPOINT ["/tw-econ-telgram-bridge"]
+ENTRYPOINT ["/tw-econ-telegram-bridge"]
