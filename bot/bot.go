@@ -44,7 +44,7 @@ func (b *Bot) Start(errch chan error) {
 					continue
 				}
 
-				err := b.tg.Publish(fmt.Sprintf(`\[%v\] %v`, b.econ.ServerName, match[1]))
+				err := b.tg.Publish(fmt.Sprintf("[%v] %v", b.econ.ServerName, match[1]))
 				if err != nil {
 					errch <- err
 				}
