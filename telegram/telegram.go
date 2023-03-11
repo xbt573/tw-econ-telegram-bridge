@@ -64,9 +64,7 @@ func (t *Telegram) broadcast(msg string) {
 }
 
 func (t *Telegram) Publish(msg string) error {
-	_, err := t.client.Send(FakeRecipient{ID: t.chatId}, msg, &telebot.SendOptions{
-		ParseMode: telebot.ModeMarkdownV2,
-	})
+	_, err := t.client.Send(FakeRecipient{ID: t.chatId}, msg)
 	if err != nil {
 		return err
 	}
