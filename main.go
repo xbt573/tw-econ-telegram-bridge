@@ -92,7 +92,12 @@ func main() {
 		econ := econ.NewECON(host, password, port)
 		err := econ.Connect()
 		if err != nil {
-			slog.Error("Failed connecting to ECON", err)
+			slog.Error(
+				"Failed connecting to ECON",
+				err,
+				slog.String("host", host),
+				slog.Int("port", port),
+			)
 			os.Exit(1)
 		}
 

@@ -16,7 +16,7 @@ var (
 	ErrAlreadyDisconnected = errors.New("econ: already disconnected")
 	ErrDisconnected        = errors.New("econ: disconnected")
 	ErrWrongPassword       = errors.New("econ: wrong password")
-	serverNameRegex        = regexp.MustCompile(`(?U)Value: ([\s\S]+)\n`)
+	serverNameRegex        = regexp.MustCompile(`Value: ([\s\S]+)\n`)
 )
 
 type ECON struct {
@@ -76,7 +76,7 @@ func (e *ECON) Connect() error {
 	}
 
 	for {
-		n, err := conn.Read(buffer)
+		n, err = conn.Read(buffer)
 		if err != nil {
 			return err
 		}

@@ -8,7 +8,7 @@ import (
 	"tw-econ-telegram-bridge/telegram"
 )
 
-var chatRegex = regexp.MustCompile(`\[chat\]: \d+:-?\d+:(.*)`)
+var chatRegex = regexp.MustCompile(`\[?chat\]?: \d+:-?\d+:(.*)`)
 
 type Bot struct {
 	econ *econ.ECON
