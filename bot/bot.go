@@ -53,12 +53,38 @@ func (b *Bot) Start(errch chan error) {
 	}()
 
 	go func() {
+	outer:
 		for {
 			msg := <-msgch
-			err := b.econ.Send(msg)
 
+			if len(strings.Split(msg, "\n")) == 1 {
+				err := b.econ.Send(msg)
+				if err != nil {
+					errch <- err
+					continue
+				}
+				continue
+			}
+
+			name, text, found := strings.Cut(msg, ": ")
+			if !found {
+				continue
+			}
+
+			err := b.econ.Send(fmt.Sprintf("%v:", name))
 			if err != nil {
 				errch <- err
+				continue
+			}
+
+			lines := strings.Split(text, "\n")
+			for _, line := range lines {
+				err := b.econ.Send(">         " + line)
+
+				if err != nil {
+					errch <- err
+					continue outer
+				}
 			}
 		}
 	}()

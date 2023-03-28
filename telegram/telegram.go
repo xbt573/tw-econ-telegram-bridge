@@ -41,6 +41,50 @@ func (t *Telegram) Listen() {
 		return nil
 	})
 
+	t.client.Handle(telebot.OnMedia, func(ctx telebot.Context) error {
+		username := strings.Join(
+			[]string{
+				ctx.Message().Sender.FirstName,
+				ctx.Message().Sender.LastName,
+			},
+			" ",
+		)
+
+		attachmentType := ""
+		switch {
+		case ctx.Message().Animation != nil:
+			attachmentType = "ANIMATION"
+
+		case ctx.Message().Audio != nil:
+			attachmentType = "AUDIO"
+
+		case ctx.Message().Photo != nil:
+			attachmentType = "PHOTO"
+
+		case ctx.Message().Sticker != nil:
+			attachmentType = "STICKER"
+
+		case ctx.Message().Video != nil:
+			attachmentType = "VIDEO"
+
+		case ctx.Message().VideoNote != nil:
+			attachmentType = "VIDEO NOTE"
+
+		case ctx.Message().Voice != nil:
+			attachmentType = "VOICE"
+		}
+
+		t.broadcast(
+			fmt.Sprintf(
+				"%v: [%v] %v",
+				username,
+				attachmentType,
+				ctx.Message().Caption,
+			),
+		)
+		return nil
+	})
+
 	t.client.Start()
 }
 
