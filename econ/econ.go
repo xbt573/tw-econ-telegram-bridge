@@ -3,8 +3,6 @@ package econ
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"net"
 	"regexp"
 	"strings"
@@ -116,14 +114,6 @@ func (e *ECON) Read() (string, error) {
 	buffer := make([]byte, 1024)
 	n, err := e.conn.Read(buffer)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			log.Println("EOF reached, trying to disconnect...")
-			err := e.Disconnect()
-			if err != nil {
-				return "", err
-			}
-			return "", nil
-		}
 		return "", err
 	}
 
@@ -137,14 +127,6 @@ func (e *ECON) Write(message string) error {
 
 	_, err := e.conn.Write([]byte(message + "\n"))
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			log.Println("EOF reached, trying to disconnect...")
-			err := e.Disconnect()
-			if err != nil {
-				return err
-			}
-			return nil
-		}
 		return err
 	}
 
