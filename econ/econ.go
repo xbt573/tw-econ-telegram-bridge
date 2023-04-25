@@ -117,6 +117,9 @@ func (e *ECON) Read() (string, error) {
 
 	buffer := make([]byte, 1024)
 
+	e.conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	defer e.conn.SetReadDeadline(time.Time{})
+
 	n, err := e.conn.Read(buffer)
 	if err != nil {
 		return "", err
@@ -130,7 +133,7 @@ func (e *ECON) Write(message string) error {
 		return ErrDisconnected
 	}
 
-	e.conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	e.conn.SetReadDeadline(time.Now().Add(time.Second * 1))
 	defer e.conn.SetReadDeadline(time.Time{})
 
 	_, err := e.conn.Write([]byte(message + "\n"))
