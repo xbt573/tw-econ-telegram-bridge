@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"regexp"
@@ -113,7 +115,9 @@ func main() {
 		for {
 			err := <-errch
 
-			slog.Error("error occured", err)
+			if !errors.Is(err, io.EOF) {
+				panic(err)
+			}
 		}
 	}()
 

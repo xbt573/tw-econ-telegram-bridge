@@ -57,7 +57,7 @@ func (e *ECON) Connect() error {
 		return ErrWrongPassword
 	}
 
-	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+	conn.SetReadDeadline(time.Now().Add(time.Second))
 
 	for {
 		_, err = conn.Read(make([]byte, 1024))
@@ -111,7 +111,12 @@ func (e *ECON) Read() (string, error) {
 		return "", ErrDisconnected
 	}
 
+	if err := e.Write(""); err != nil {
+		return "", err
+	}
+
 	buffer := make([]byte, 1024)
+
 	n, err := e.conn.Read(buffer)
 	if err != nil {
 		return "", err
@@ -124,6 +129,9 @@ func (e *ECON) Write(message string) error {
 	if e.conn == nil {
 		return ErrDisconnected
 	}
+
+	e.conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	defer e.conn.SetReadDeadline(time.Time{})
 
 	_, err := e.conn.Write([]byte(message + "\n"))
 	if err != nil {
