@@ -122,7 +122,7 @@ func (e *ECON) Read() (string, error) {
 
 	n, err := e.conn.Read(buffer)
 	if err != nil {
-		return "", err
+		return "", nil
 	}
 
 	return string(buffer[:n]), nil
