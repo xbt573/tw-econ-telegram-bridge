@@ -7,4 +7,3 @@ Environment variables:
 * TW_PASSWORD
 * API_TOKEN
 * CHAT_ID
-* SERVER_NAME

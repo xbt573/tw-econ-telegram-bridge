@@ -37,7 +37,10 @@ func (t *Telegram) Listen() {
 			" ",
 		)
 
-		t.broadcast(fmt.Sprintf("%v: %v", username, ctx.Message().Text))
+        text := ReplaceFromEmoji(ctx.Message().Text)
+        text = strings.ReplaceAll(text, "\"", "\\\"")
+
+		t.broadcast(fmt.Sprintf("%v: %v", username, text))
 		return nil
 	})
 
@@ -73,13 +76,16 @@ func (t *Telegram) Listen() {
 		case ctx.Message().Voice != nil:
 			attachmentType = "VOICE"
 		}
+        
+        text := ReplaceFromEmoji(ctx.Message().Text)
+        text = strings.ReplaceAll(text, "\"", "\\\"")
 
 		t.broadcast(
 			fmt.Sprintf(
 				"%v: [%v] %v",
 				username,
 				attachmentType,
-				ctx.Message().Caption,
+				text,
 			),
 		)
 		return nil
@@ -108,7 +114,7 @@ func (t *Telegram) broadcast(msg string) {
 }
 
 func (t *Telegram) Publish(msg string) error {
-	_, err := t.client.Send(FakeRecipient{ID: t.chatId}, msg)
+	_, err := t.client.Send(FakeRecipient{ID: t.chatId}, ReplaceToEmoji(msg))
 	if err != nil {
 		return err
 	}
