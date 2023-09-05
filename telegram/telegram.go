@@ -9,12 +9,12 @@ import (
 
 type Telegram struct {
 	client *telebot.Bot
-	chatId string
+	chatId int64
 
 	listeners []chan string // econs who are listening for tg
 }
 
-func NewTelegram(settings telebot.Settings, chatId string) (*Telegram, error) {
+func NewTelegram(settings telebot.Settings, chatId int64) (*Telegram, error) {
 	bot, err := telebot.NewBot(settings)
 	if err != nil {
 		return nil, err
@@ -29,6 +29,10 @@ func NewTelegram(settings telebot.Settings, chatId string) (*Telegram, error) {
 
 func (t *Telegram) Listen() {
 	t.client.Handle(telebot.OnText, func(ctx telebot.Context) error {
+		if ctx.Chat().ID != t.chatId {
+			return nil
+		}
+
 		username := strings.Join(
 			[]string{
 				ctx.Message().Sender.FirstName,
@@ -37,8 +41,8 @@ func (t *Telegram) Listen() {
 			" ",
 		)
 
-        text := ReplaceFromEmoji(ctx.Message().Text)
-        text = strings.ReplaceAll(text, "\"", "\\\"")
+		text := ReplaceFromEmoji(ctx.Message().Text)
+		text = strings.ReplaceAll(text, "\"", "\\\"")
 
 		t.broadcast(fmt.Sprintf("%v: %v", username, text))
 		return nil
@@ -76,9 +80,9 @@ func (t *Telegram) Listen() {
 		case ctx.Message().Voice != nil:
 			attachmentType = "VOICE"
 		}
-        
-        text := ReplaceFromEmoji(ctx.Message().Text)
-        text = strings.ReplaceAll(text, "\"", "\\\"")
+
+		text := ReplaceFromEmoji(ctx.Message().Text)
+		text = strings.ReplaceAll(text, "\"", "\\\"")
 
 		t.broadcast(
 			fmt.Sprintf(
@@ -114,7 +118,7 @@ func (t *Telegram) broadcast(msg string) {
 }
 
 func (t *Telegram) Publish(msg string) error {
-	_, err := t.client.Send(FakeRecipient{ID: t.chatId}, ReplaceToEmoji(msg))
+	_, err := t.client.Send(RecipientFromInt64(t.chatId), ReplaceToEmoji(msg))
 	if err != nil {
 		return err
 	}
