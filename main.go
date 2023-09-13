@@ -13,8 +13,8 @@ import (
 	"tw-econ-telegram-bridge/econ"
 	"tw-econ-telegram-bridge/telegram"
 
-	"golang.org/x/exp/slog"
 	"gopkg.in/telebot.v3"
+	"log/slog"
 )
 
 var (
@@ -31,10 +31,16 @@ var (
 func main() {
 	slog.Info("Starting service...")
 
+	chatIdInt, err := strconv.ParseInt(chatId, 10, 64)
+	if err != nil {
+		slog.Error("Failed parsing chatId", err)
+		os.Exit(1)
+	}
+
 	tg, err := telegram.NewTelegram(telebot.Settings{
 		Token:  token,
 		Poller: &telebot.LongPoller{Timeout: time.Second * 5},
-	}, chatId)
+	}, chatIdInt)
 	if err != nil {
 		slog.Error("Failed creating bot", err)
 		os.Exit(1)
