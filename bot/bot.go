@@ -1,98 +1,78 @@
 package bot
 
 import (
-	"fmt"
-	"regexp"
-	"strings"
-	"tw-econ-telegram-bridge/econ"
-	"tw-econ-telegram-bridge/telegram"
+	"context"
+	"github.com/xbt573/tw-econ-telegram-bridge/econ"
 )
 
-var chatRegex = regexp.MustCompile(`\[?chat\]?: \d+:-?\d+:(.*)`)
-
 type Bot struct {
-	econ *econ.ECON
-	tg   *telegram.Telegram
-
-	closed chan bool
+	econ        *econ.ECON
+	serverType  econ.ServerType
+	receiveChan chan string
+	sendChan    chan string
 }
 
-func NewBot(econ *econ.ECON, tg *telegram.Telegram) *Bot {
+type BotOpts struct {
+	Econ        *econ.ECON
+	ServerType  econ.ServerType
+	ReceiveChan chan string
+	SendChan    chan string
+}
+
+func NewBot(opts BotOpts) *Bot {
 	return &Bot{
-		econ:   econ,
-		tg:     tg,
-		closed: make(chan bool),
+		econ:        opts.Econ,
+		receiveChan: opts.ReceiveChan,
+		sendChan:    opts.SendChan,
+		serverType:  opts.ServerType,
 	}
 }
 
-func (b *Bot) Start(errch chan error) {
-	msgch := make(chan string)
+func (b *Bot) Start(ctx context.Context) error {
+	err := b.econ.Connect()
+	if err != nil {
+		return err
+	}
 
-	b.tg.Subscribe(msgch)
-	defer b.tg.Unsubscribe(msgch)
+	defer b.econ.Disconnect()
+
+	errch := make(chan error)
 
 	go func() {
-		for b.econ.Connected {
-			message, err := b.econ.Read()
-			if err != nil {
-				errch <- err
-				continue
-			}
-			if strings.Contains(message, "chat") {
-				match := chatRegex.FindStringSubmatch(message)
-				if len(match) == 0 {
-					continue
-				}
-
-				err := b.tg.Publish(fmt.Sprintf("[%v]\n%v", b.econ.ServerName, match[1]))
+		for b.econ.Connected() {
+			select {
+			case <-ctx.Done():
+				return
+			case x := <-b.receiveChan:
+				err := b.econ.Message(x)
 				if err != nil {
 					errch <- err
+					return
 				}
 			}
 		}
 	}()
 
-	go func() {
-	outer:
-		for {
-			msg := <-msgch
-
-			if len(strings.Split(msg, "\n")) == 1 {
-				err := b.econ.Send(msg)
-				if err != nil {
-					errch <- err
-					continue
-				}
-				continue
-			}
-
-			name, text, found := strings.Cut(msg, ": ")
-			if !found {
-				continue
-			}
-
-			err := b.econ.Send(fmt.Sprintf("%v:", name))
+	for b.econ.Connected() {
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-errch:
+			return err
+		default:
+			msg, err := b.econ.Read()
 			if err != nil {
-				errch <- err
+				return err
+			}
+
+			text, ok := econ.Adapters[b.serverType].Match(msg)
+			if !ok {
 				continue
 			}
 
-			lines := strings.Split(text, "\n")
-			for _, line := range lines {
-				err := b.econ.Send(">         " + line)
-
-				if err != nil {
-					errch <- err
-					continue outer
-				}
-			}
+			b.sendChan <- text
 		}
-	}()
+	}
 
-	<-b.closed
-}
-
-func (b *Bot) Close() {
-	b.closed <- true
-	b.econ.Disconnect()
+	return nil
 }

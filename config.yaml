@@ -1,0 +1,14 @@
+# Your chat id
+chat_id: -1228691488
+# Your thread id
+thread_id: 30
+# Server ip
+ip: 127.0.0.1
+# Server ECON port
+port: 2280
+# Server econ password
+password: password
+# Telegram bot API token
+token: "ASDF:12387316872_124124"
+# Server type (on of "ddnet", "teeworlds", or "trainfng")
+type: ddnet
