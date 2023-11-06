@@ -11,7 +11,7 @@ var (
 	trainfngJoinRegex = regexp.MustCompile(`\[.*\]\[.*\]: \*\*\* '(.*)' (.*)`)
 
 	ddnetChatRegex = regexp.MustCompile(`.* I chat: \d+:-?\d+:(.*)`)
-	ddnetJoinRegex = regexp.MustCompile(`.* I chat: \*\*\* '(.*)' (.*)`)
+	ddnetJoinRegex = regexp.MustCompile(`.* I chat: \*\*\* '(.*?)' (.*)`)
 )
 
 type ServerType string
