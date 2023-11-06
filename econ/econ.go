@@ -55,7 +55,7 @@ func (e *ECON) Connect() error {
 	}
 
 	// read out useless info
-	conn.SetReadDeadline(time.Now().Add(time.Second))
+	conn.SetReadDeadline(time.Now().Add(time.Second * 2))
 	_, err = conn.Read(make([]byte, 1024))
 	if err != nil && !os.IsTimeout(err) {
 		conn.Close()
@@ -69,7 +69,7 @@ func (e *ECON) Connect() error {
 		return err
 	}
 
-	conn.SetReadDeadline(time.Now().Add(time.Second))
+	conn.SetReadDeadline(time.Now().Add(time.Second * 2))
 	buf := make([]byte, 1024)
 	n, err := conn.Read(buf)
 	if err != nil && !os.IsTimeout(err) {
