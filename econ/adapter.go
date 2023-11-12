@@ -4,7 +4,7 @@ import "regexp"
 
 var (
 	teeworldsChatRegex  = regexp.MustCompile(`\[chat\]: \d+:-?\d+:(.*)`)
-	teeworldsJoinRegex  = regexp.MustCompile(`\[game\]: team_join player='\d+:(.*)'.*=\d+`)
+	teeworldsJoinRegex  = regexp.MustCompile(`\[game\]: team_join player='\d+:(.*)'`)
 	teeworldsLeaveRegex = regexp.MustCompile(`\[game\]: leave player='\d+:(.*)'`)
 
 	trainfngChatRegex = regexp.MustCompile(`\[.*?\]\[chat\]: \d+:-?\d+:(.*)`)
